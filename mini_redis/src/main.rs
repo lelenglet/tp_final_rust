@@ -1,5 +1,16 @@
+mod handler;
+mod model;
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::net::{TcpListener, TcpStream};
+
+use crate::handler::{process_command, Store};
+use crate::model::Request;
+
 #[tokio::main]
-async fn main() {
+async fn main() -> tokio::io::Result<()> {
     // Initialiser tracing
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -8,14 +19,42 @@ async fn main() {
         )
         .init();
 
-    // TODO: Implémenter le serveur MiniRedis sur 127.0.0.1:7878
-    //
-    // Étapes suggérées :
-    // 1. Créer le store partagé (Arc<Mutex<HashMap<String, ...>>>)
-    // 2. Bind un TcpListener sur 127.0.0.1:7878
-    // 3. Accept loop : pour chaque connexion, spawn une tâche
-    // 4. Dans chaque tâche : lire les requêtes JSON ligne par ligne,
-    //    traiter la commande, envoyer la réponse JSON + '\n'
+    let store: Store = Arc::new(tokio::sync::RwLock::new(HashMap::new()));
 
-    println!("MiniRedis - à implémenter !");
+    let addr = "127.0.0.1:7878";
+    let listener = TcpListener::bind(addr).await?;
+    println!("MiniRedis écoute sur {}", addr);
+
+    loop {
+        let (socket, _) = listener.accept().await?;
+        let store_clone = Arc::clone(&store);
+        tokio::spawn(async move {
+            if let Err(e) = handle_client(socket, store_clone).await {
+                eprintln!("Erreur client: {}", e);
+            }
+        });
+    }
+}
+
+async fn handle_client(mut socket: TcpStream, store: Store) -> tokio::io::Result<()> {
+    let (reader, mut writer) = socket.split();
+    let mut reader = BufReader::new(reader);
+    let mut line = String::new();
+
+    loop {
+        line.clear();
+        if reader.read_line(&mut line).await? == 0 {
+            break;
+        }
+
+        let response = match serde_json::from_str::<Request>(&line) {
+            Ok(req) => process_command(req, &store).await,
+            Err(_) => crate::model::Response::error("invalid json"),
+        };
+
+        let mut resp_json = serde_json::to_string(&response).unwrap();
+        resp_json.push('\n');
+        writer.write_all(resp_json.as_bytes()).await?;
+    }
+    Ok(())
 }
