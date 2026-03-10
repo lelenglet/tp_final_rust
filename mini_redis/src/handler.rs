@@ -9,8 +9,10 @@ pub struct Entry {
     pub expires_at: Option<Instant>,
 }
 
+// J'ai utilisé le RwLock car que certaines opérations ont besoin de modifié la ressource
 pub type Store = Arc<RwLock<HashMap<String, Entry>>>;
 
+// Fonction permettant le traitement des différentes requêtes
 pub async fn process_command(req: Request, store: &Store) -> Response {
     match req.cmd.as_str() {
         "PING" => Response::ok(),

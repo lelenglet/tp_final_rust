@@ -11,7 +11,7 @@ mod tests {
     use tokio::sync::RwLock;
 
     #[tokio::test]
-    async fn test_full_palier_3_save() {
+    async fn test_save() {
         let store: Store = Arc::new(RwLock::new(HashMap::new()));
         {
             let mut db = store.write().await;
@@ -46,7 +46,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_incr_logic() {
+    async fn test_incr() {
         let store: Store = Arc::new(RwLock::new(HashMap::new()));
 
         let req_incr = Request {

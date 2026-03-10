@@ -18,6 +18,7 @@ pub struct Response {
     pub ttl: Option<i64>,
 }
 
+// Implémentations possibles pour une réponse
 impl Response {
     pub fn ok() -> Self {
         Self {
